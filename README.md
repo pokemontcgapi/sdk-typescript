@@ -131,11 +131,13 @@ Stated up front so you find out here rather than three days into an integration:
 
 - **No Korean cards.** Zero `KR` sets, zero `ko` translations. Both are modelled in the schema and
   carry no data.
-- **No card game text.** `attacks`, `abilities`, `weaknesses`, `resistances`, `subtypes`,
-  `retreat_cost`, `rules`, `flavor_text` and `legalities` are empty for every card; `types` and
-  `national_pokedex_numbers` are populated only on part of the Scarlet & Violet era. The types in
-  this package say so on each field. If you are building a deck checker or a rules engine, this is
-  not the data source you need.
+- **Card game text is English, and uneven.** `attacks`, `abilities`, `weaknesses`, `resistances`,
+  `subtypes`, `retreat_cost`, `rules` and `flavor_text` carry rows since 3 September 2026, on the
+  20,725 Western printings — `attacks` on 33% of the whole catalogue and 83% of the Western part.
+  Japanese and Chinese printings carry none. The types in this package keep them nullable and say
+  the measured rate on each field, so the compiler makes you handle the half that is absent.
+- **No format legalities.** `legalities` is empty for every card. If you are building a deck
+  checker, this is still not the data source you need.
 
 What it does have: the printing itself — set, number, rarity, region, release date, illustrator,
 image, marketplace ids, six-language names — and prices.

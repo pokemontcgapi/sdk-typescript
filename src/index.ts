@@ -144,37 +144,51 @@ class ArtistsResource {
 }
 
 /**
- * I vocabolari chiusi, per popolare i filtri di una UI senza indovinare le
- * stringhe.
+ * I vocabolari, per popolare i filtri di una UI senza indovinare le stringhe.
  *
- * `subtypes()` oggi torna una lista VUOTA: la colonna esiste ma non e'
- * popolata su nessuna carta. Il metodo resta perche' il giorno in cui lo sara'
- * non serve una nuova versione dell'SDK — ma non costruirci sopra una UI che
- * assume almeno un elemento.
+ * Fino al 2026-09-03 questi quattro metodi chiamavano `/v1/types`,
+ * `/v1/subtypes`, `/v1/supertypes` e `/v1/rarities`, che il servizio non ha
+ * mai montato: rispondevano 404, e l'SDK prometteva quattro chiamate che non
+ * potevano riuscire. Ora leggono `/v1/reference`, che le porta tutte insieme.
+ *
+ * Una sola richiesta di rete anche chiamandoli tutti e quattro: la risposta e'
+ * la stessa e viene memorizzata per la durata dell'istanza del client. Le firme
+ * non sono cambiate, quindi chi aveva scritto il codice contro la promessa non
+ * deve toccarlo — comincia solo a funzionare.
  */
 class ReferenceResource {
   constructor(private readonly http: HttpClient) {}
 
-  private async list(path: string): Promise<readonly string[]> {
-    const body = await this.http.get<{ data: readonly string[] }>(path);
-    return body.data;
+  private pending: Promise<Record<string, readonly string[]>> | null = null;
+
+  private all(): Promise<Record<string, readonly string[]>> {
+    // La promise, non il valore: due chiamate ravvicinate condividono una
+    // richiesta sola invece di farne due e tenere l'ultima.
+    this.pending ??= this.http
+      .get<{ data: Record<string, readonly string[]> }>('/v1/reference')
+      .then((body) => body.data);
+    return this.pending;
+  }
+
+  private async list(key: string): Promise<readonly string[]> {
+    const data = await this.all();
+    return data[key] ?? [];
   }
 
   types(): Promise<readonly string[]> {
-    return this.list('/v1/types');
+    return this.list('types');
   }
 
-  /** Vuoto al 2026-08-27. Vedi la nota sulla classe. */
   subtypes(): Promise<readonly string[]> {
-    return this.list('/v1/subtypes');
+    return this.list('subtypes');
   }
 
   supertypes(): Promise<readonly string[]> {
-    return this.list('/v1/supertypes');
+    return this.list('supertypes');
   }
 
   rarities(): Promise<readonly string[]> {
-    return this.list('/v1/rarities');
+    return this.list('rarities');
   }
 }
 
