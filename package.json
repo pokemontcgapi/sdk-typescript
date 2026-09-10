@@ -1,10 +1,12 @@
 {
   "name": "@pokemontcgapi/sdk",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "TypeScript client for the pokemontcgapi.com Pokémon TCG API: cards, sets, artists, images and prices with stated provenance.",
   "license": "MIT",
   "type": "module",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "sideEffects": false,
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -14,7 +16,10 @@
       "default": "./dist/index.js"
     }
   },
-  "files": ["dist", "README.md"],
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "keywords": [
     "pokemon",
     "pokemon-tcg",
@@ -25,9 +30,14 @@
     "card-prices",
     "japanese-cards"
   ],
-  "repository": { "type": "git", "url": "git+https://github.com/pokemontcgapi/sdk-typescript.git" },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pokemontcgapi/sdk-typescript.git"
+  },
   "homepage": "https://pokemontcgapi.com/sdk",
-  "bugs": { "url": "https://github.com/pokemontcgapi/sdk-typescript/issues" },
+  "bugs": {
+    "url": "https://github.com/pokemontcgapi/sdk-typescript/issues"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",

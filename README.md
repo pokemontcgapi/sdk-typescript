@@ -54,6 +54,7 @@ mistake rather than a choice.
 
 ```ts
 const { data, requested, found } = await client.cards.batch(['bs-4', 'sv3-001'], {
+  include: ['index'], // index_eur on list and batch rows is opt-in: 1 credit per 50 cards
   select: ['id', 'name', 'index_eur'],
 });
 ```
@@ -154,8 +155,8 @@ for (const price of card.prices ?? []) {
 There is no printing filter: first edition, holofoil and graded rows come back together, so read
 `printing`, `condition` and `grading` per row. `basis` separates `GUIDE` (published upstream) from
 `DERIVED` (computed by us). `PTCG_INDEX` is a composite index in EUR carrying `sample_n`, and it is
-also on every card row as `index_eur`, so a list already has a comparable number without a second
-request per card.
+also on every single card as `index_eur`. On a list or batch it comes with `include: ['index']`
+(1 credit per 50 rows), so a list still has a comparable number without a second request per card.
 
 ## Also available
 

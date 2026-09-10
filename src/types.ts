@@ -198,7 +198,7 @@ export interface BatchResult<T> {
 
 // ── parametri ───────────────────────────────────────────────────────────────
 
-export type CardInclude = 'prices' | 'legalities' | 'translations' | 'images' | 'set' | 'artist';
+export type CardInclude = 'index' | 'prices' | 'legalities' | 'translations' | 'images' | 'set' | 'artist';
 
 export interface ListParams {
   /**
