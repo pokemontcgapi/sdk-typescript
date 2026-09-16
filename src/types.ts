@@ -11,7 +11,11 @@
  * Non prima.
  */
 
-export type Locale = 'en' | 'ja' | 'fr' | 'de' | 'es' | 'it';
+// Gli otto locali con righe in tabella, misurati il 2026-09-16: en 57.421,
+// fr 42.858, de 42.604, ja 27.230, it 21.644, es 21.003, pt 13.822, zh 3.492.
+// L'API ne accetta nove, ma `ko` ha zero righe e un tipo non promette cio' che
+// non esiste.
+export type Locale = 'en' | 'fr' | 'de' | 'ja' | 'it' | 'es' | 'pt' | 'zh';
 
 /**
  * Regione di stampa. `KR` esiste nello schema del server ma al 2026-08-27 non
@@ -22,10 +26,11 @@ export type PrintRegion = 'WEST' | 'JP' | 'CN' | 'KR';
 
 export type PriceSource =
   | 'TCGPLAYER'
+  | 'PRICECHARTING'
   | 'CARDMARKET'
   | 'CARDTRADER'
-  /** Vendite concluse su eBay, aggregate da PriceCharting (che resta nominato in `provenance`). */
-  | 'EBAY_SOLD'
+  /** Vendite concluse su eBay. `EBAY_SOLD` non e' mai esistito: il valore ammesso e' `EBAY`. */
+  | 'EBAY'
   | 'PTCG_INDEX'
   | 'COMMUNITY';
 
@@ -41,7 +46,15 @@ export interface Price {
   readonly source: PriceSource | string;
   readonly variant: string;
   readonly basis: PriceBasis | string;
-  readonly price: number;
+  /**
+   * Il numero, con la sua valuta nel campo fratello.
+   *
+   * Si chiamava `price` qui dentro mentre l'API risponde `amount` da quando le
+   * righe prezzo sono state riscritte: chi leggeva `quote.price` otteneva
+   * `undefined` con il compilatore che gli prometteva un `number`. Nessuno se
+   * ne era accorto perche' sulla prova l'array `quotes` torna vuoto.
+   */
+  readonly amount: number;
   readonly currency: string;
   readonly locale: string | null;
   readonly condition: string | null;

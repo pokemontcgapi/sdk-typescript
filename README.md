@@ -1,9 +1,13 @@
 # @pokemontcgapi/sdk
 
-TypeScript client for the Pokémon TCG API at [pokemontcgapi.com](https://pokemontcgapi.com) —
-**615 sets and 52,337 cards** across three print regions (379 Japanese, 176 international, 60
-Simplified Chinese), card names in six languages, 399 illustrators, images, and prices that state
-their source, basis, grade and sample size.
+TypeScript client for the Pokémon TCG API at [pokemontcgapi.com](https://pokemontcgapi.com): cards,
+sets, illustrators, the reference vocabularies and photo recognition, across three print lines,
+international, Japanese and Simplified Chinese, with card names in eight locales, images, and prices
+that state their source, basis, grade and sample size. The current counts are live at
+[/v1/status](https://api.pokemontcgapi.com/v1/status).
+
+**Sealed products and the `/v1/changes` feed have no client here yet.** The API serves both; this
+package does not wrap them, so reach them over plain REST until it does.
 
 **Zero runtime dependencies.** Uses the global `fetch`, so it runs unchanged on Node ≥ 20, Bun, Deno,
 Cloudflare Workers and in the browser.
@@ -11,6 +15,21 @@ Cloudflare Workers and in the browser.
 Unofficial. Not produced, endorsed, supported by or affiliated with Nintendo, Creatures Inc.,
 GAME FREAK inc. or The Pokémon Company International. Pokémon and all related marks are trademarks of
 their respective owners.
+
+## Get a key
+
+One call, no dashboard and no card:
+
+```bash
+curl -s -X POST "https://api.pokemontcgapi.com/v1/accounts/free" \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: $(uuidgen)" \
+  -d '{"email":"you@example.com"}'
+```
+
+The key comes back once, in `data.key.secret`. Confirming the address we email raises the trial from
+80 to 800 credits, and the trial ends 30 days after signup. Paid plans start at 29 EUR a month:
+[pricing](https://pokemontcgapi.com/pricing).
 
 ## Install
 
@@ -27,7 +46,7 @@ const client = new PokemonTcgApi({ apiKey: process.env.PTCG_API_KEY });
 
 const card = await client.cards.get('base1-4', { include: ['prices'] });
 console.log(card.id, card.name, card.index_eur);
-// bs-4 Charizard 561.84
+// bs-4 Charizard 523.76   ← the index on 16 September 2026; it moves, yours will differ
 ```
 
 `base1-4` and `bs-4` both resolve: the id is the printed coordinate — set code, dash, collector
@@ -69,7 +88,9 @@ console.log(page.data[0]?.name); // タマタマ
 ```
 
 `lang` replaces the `name` field itself and falls back to English where a translation is missing.
-Locales: `en`, `ja`, `fr`, `de`, `es`, `it`.
+Locales, with the rows each one actually has on 16 September 2026: `en` 57,421, `fr` 42,858,
+`de` 42,604, `ja` 27,230, `it` 21,644, `es` 21,003, `pt` 13,822, `zh` 3,492. A thin locale answers
+mostly in English, because the fallback is per card and not per request.
 
 ### Conditional requests are free
 
@@ -77,10 +98,15 @@ Locales: `en`, `ja`, `fr`, `de`, `es`, `it`.
 const client = new PokemonTcgApi({ cache: 'etag' });
 ```
 
-Every collection carries a strong ETag. With the cache on, the client stores it and replays a `304`
-without a body — no quota consumed. A mirror that re-syncs often pays only for what changed.
+Every collection carries an ETag. We compute it strong, from the body; the edge rewrites it weak with
+an encoding suffix when it compresses, so what you receive looks like `W/"…-gzip"` and you send back
+exactly that. With the cache on, the client stores it and replays a `304` without a body, and a `304`
+consumes no quota. A mirror that re-syncs often pays only for what changed.
 
 ### A photo instead of an id
+
+**Included from the Growth plan up.** On a trial or a Developer key the call answers `403
+PLAN_REQUIRED` with `details.min_plan`, before reading the image and without spending credits.
 
 ```ts
 const { data } = await client.vision.identify(file, { set: 'sv3' });
@@ -134,7 +160,8 @@ Stated up front so you find out here rather than three days into an integration:
   carry no data.
 - **Card game text is English, and uneven.** `attacks`, `abilities`, `weaknesses`, `resistances`,
   `subtypes`, `retreat_cost`, `rules` and `flavor_text` carry rows since 3 September 2026, on the
-  20,725 Western printings — `attacks` on 33% of the whole catalogue and 83% of the Western part.
+  20,725 Western printings. Measured on 16 September 2026 against 57,450 cards: `attacks` on 29.9% of
+  the whole catalogue and 82.9% of the Western part, `subtypes` 35.0%, `abilities` 7.0%.
   Japanese and Chinese printings carry none. The types in this package keep them nullable and say
   the measured rate on each field, so the compiler makes you handle the half that is absent.
 - **No format legalities.** `legalities` is empty for every card. If you are building a deck
@@ -148,15 +175,31 @@ image, marketplace ids, six-language names — and prices.
 ```ts
 const card = await client.cards.get('base1-4', { include: ['prices'] });
 for (const price of card.prices ?? []) {
-  console.log(price.source, price.basis, price.price, price.currency, price.as_of, price.sample_n);
+  console.log(price.source, price.basis, price.amount, price.currency, price.as_of, price.sample_n);
 }
 ```
 
 There is no printing filter: first edition, holofoil and graded rows come back together, so read
 `printing`, `condition` and `grading` per row. `basis` separates `GUIDE` (published upstream) from
-`DERIVED` (computed by us). `PTCG_INDEX` is a composite index in EUR carrying `sample_n`, and it is
-also on every single card as `index_eur`. On a list or batch it comes with `include: ['index']`
+`DERIVED` (computed by us). `PTCG_INDEX` is a composite index in EUR carrying `sample_n`, and the same
+number sits on the card row as `index_eur` wherever we have enough observations to compute one: 51,636
+cards of 57,450 on 16 September 2026, so treat it as nullable. On a list or batch it comes with `include: ['index']`
 (1 credit per 50 rows), so a list still has a comparable number without a second request per card.
+
+What your plan withholds is named rather than hidden, but it is named in three different places, so
+read the one that matches the call you made:
+
+| call | where the exclusions are |
+|---|---|
+| `GET /v1/cards/{id}/prices` | `meta.withheld` |
+| `GET /v1/cards/{id}?include=prices` | the `X-Plan-Withheld` response header |
+| `GET /v1/cards/batch` | a top-level `withheld` field |
+
+The values are `graded` and `non_english_locales`: a trial key gets both, Developer keeps `graded`,
+and from Growth up nothing is withheld, in which case the field is absent rather than an empty array.
+Read it before concluding that a card has no graded observations: it may be your plan, not the
+catalogue. Prices also carry their own `locale`, and a card read with `include: ['prices']` returns
+every locale your plan allows, so the currency does not tell you the language.
 
 ## Also available
 
