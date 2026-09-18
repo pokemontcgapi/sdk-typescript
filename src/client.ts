@@ -40,6 +40,54 @@ export interface ClientOptions {
    */
   readonly cache?: 'none' | 'etag';
   readonly userAgent?: string;
+  /** Chiamata a ogni risposta ricevuta, errori compresi: il posto per un contatore di crediti. */
+  readonly onResponse?: (info: ResponseInfo) => void;
+}
+
+/**
+ * Cio' che la risposta dice negli header e che il corpo non porta.
+ *
+ * `planWithheld` e' il motivo per cui esiste: su `cards.get(id, { include:
+ * ['prices'] })` le righe che il piano non copre (le quotazioni gradate sotto
+ * Growth) mancano in silenzio dal corpo, e solo `X-Plan-Withheld` lo dice.
+ */
+export interface ResponseInfo {
+  readonly url: string;
+  readonly status: number;
+  readonly requestId: string | null;
+  /** Crediti scalati da questa chiamata. 0 su rotte gratuite, 304 ed errori del client. */
+  readonly creditsCost: number | null;
+  readonly quotaLimit: number | null;
+  readonly quotaRemaining: number | null;
+  readonly quotaReset: string | null;
+  readonly rateLimitRemaining: number | null;
+  readonly planWithheld: readonly string[];
+  /** Solo sulla prova: quando scade. */
+  readonly trialExpiresAt: string | null;
+}
+
+function headerNumber(headers: Headers, name: string): number | null {
+  const raw = headers.get(name);
+  if (raw === null) return null;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : null;
+}
+
+function toResponseInfo(url: string, response: Response): ResponseInfo {
+  const h = response.headers;
+  const withheld = h.get('x-plan-withheld');
+  return {
+    url,
+    status: response.status,
+    requestId: h.get('x-request-id'),
+    creditsCost: headerNumber(h, 'x-credits-cost'),
+    quotaLimit: headerNumber(h, 'x-quota-limit'),
+    quotaRemaining: headerNumber(h, 'x-quota-remaining'),
+    quotaReset: h.get('x-quota-reset'),
+    rateLimitRemaining: headerNumber(h, 'ratelimit-remaining'),
+    planWithheld: withheld === null || withheld === '' ? [] : withheld.split(',').map((v) => v.trim()),
+    trialExpiresAt: h.get('x-trial-expires-at'),
+  };
 }
 
 const DEFAULT_BASE_URL = 'https://api.pokemontcgapi.com';
@@ -105,6 +153,10 @@ export class HttpClient {
   private readonly doFetch: typeof globalThis.fetch;
   private readonly userAgent: string;
   private readonly etags: Map<string, { etag: string; body: unknown }> | null;
+  private readonly onResponse: ((info: ResponseInfo) => void) | undefined;
+
+  /** Gli header dell'ultima risposta ricevuta da questa istanza. */
+  lastResponse: ResponseInfo | null = null;
 
   constructor(options: ClientOptions = {}) {
     this.baseUrl = (options.baseUrl ?? DEFAULT_BASE_URL).replace(/\/+$/, '');
@@ -114,6 +166,7 @@ export class HttpClient {
     this.doFetch = options.fetch ?? globalThis.fetch.bind(globalThis);
     this.userAgent = options.userAgent ?? '@pokemontcgapi/sdk';
     this.etags = options.cache === 'etag' ? new Map() : null;
+    this.onResponse = options.onResponse;
   }
 
   /** URL assoluto da un path applicativo piu' i parametri. */
@@ -207,6 +260,9 @@ export class HttpClient {
       clearTimeout(timer);
     }
 
+    this.lastResponse = toResponseInfo(url, response);
+    this.onResponse?.(this.lastResponse);
+
     // 304: il corpo e' vuoto per definizione, la risposta e' quella in cache.
     if (response.status === 304 && cached !== undefined) return cached.body as T;
 
@@ -285,8 +341,8 @@ export class Page<T> implements AsyncIterable<T> {
   }
 
   /**
-   * Materializza in un array. `max` e' OBBLIGATORIO: il catalogo ha oltre
-   * 52.000 carte, e un `.toArray()` senza tetto e' il modo piu' rapido di
+   * Materializza in un array. `max` e' OBBLIGATORIO: il catalogo ha decine di
+   * migliaia di carte, e un `.toArray()` senza tetto e' il modo piu' rapido di
    * riempire la memoria di un processo per sbaglio.
    */
   async toArray({ max }: { max: number }): Promise<T[]> {

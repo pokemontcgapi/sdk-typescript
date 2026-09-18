@@ -2,13 +2,10 @@
  * Le forme che l'API restituisce.
  *
  * Sono scritte a mano e non generate, e i campi portano il commento di cio' che
- * contengono DAVVERO: al 2026-08-27 una parte dell'oggetto carta e' modellata
- * ma vuota su tutto il catalogo, e un tipo che promette `attacks: Attack[]`
- * fa scrivere codice che poi non gira mai. `| null` non basta a dirlo: il
- * commento sopra il campo si', ed e' quello che si legge nell'editor.
- *
- * Regola: quando l'API smette di essere vuota su un campo, si toglie la nota.
- * Non prima.
+ * contengono DAVVERO: il testo di gioco e' presente solo su una parte del
+ * catalogo, e un tipo che promette `attacks: Attack[]` fa scrivere codice che
+ * poi non gira mai. `| null` non basta a dirlo: il commento sopra il campo si',
+ * ed e' quello che si legge nell'editor.
  */
 
 // Gli otto locali con righe in tabella, misurati il 2026-09-16: en 57.421,
@@ -93,6 +90,9 @@ export interface Card {
   readonly number_sort: number | null;
   readonly supertype: string | null;
   readonly hp: number | null;
+  readonly level: string | null;
+  readonly evolves_from: string | null;
+  readonly evolves_to: readonly string[] | null;
   readonly rarity: string | null;
   readonly regulation_mark: string | null;
 
@@ -107,12 +107,18 @@ export interface Card {
   readonly artist_name: string | null;
   readonly artist_slug: string | null;
 
-  /** Indice composito in euro, gia' sulla riga: niente seconda chiamata per una lista. */
-  readonly index_eur: number | null;
-  readonly last_price_at: string | null;
+  /**
+   * Indice composito in euro. Sulla carta singola c'e' sempre; sulle righe di
+   * una lista o di un batch SOLO con `include: ['index']` (1 credito ogni 50
+   * carte). Senza, il campo non arriva e `meta.withheld` contiene `"index"`.
+   */
+  readonly index_eur?: number | null;
+  readonly last_price_at?: string | null;
 
   readonly tcgplayer_id: number | null;
   readonly cardmarket_id: number | null;
+  /** La stampa giapponese della stessa carta, dove l'abbinamento e' noto. */
+  readonly jp_twin_id: string | null;
 
   readonly row_version: number;
   readonly created_at: string;
@@ -123,27 +129,22 @@ export interface Card {
   readonly images?: readonly CardImage[];
   readonly translations?: readonly Translation[];
   readonly set?: CardSet;
+  readonly artist?: Artist;
 
-  // ── campi modellati e OGGI VUOTI su tutto il catalogo ─────────────────────
-  /** Vuoto su tutto il catalogo al 2026-08-27. */
+  // ── testo di gioco ───────────────────────────────────────────────────────
+  // Presente in inglese sulle stampe occidentali e in modo disomogeneo: gli
+  // attacchi su circa un terzo del catalogo, niente sulle stampe giapponesi e
+  // cinesi. `null` significa "dato non tenuto", mai "la carta non ha attacchi".
   readonly attacks: unknown[] | null;
-  /** Vuoto su tutto il catalogo al 2026-08-27. */
   readonly abilities: unknown[] | null;
-  /** Vuoto su tutto il catalogo al 2026-08-27. */
   readonly weaknesses: unknown[] | null;
-  /** Vuoto su tutto il catalogo al 2026-08-27. */
   readonly resistances: unknown[] | null;
-  /** Vuoto su tutto il catalogo al 2026-08-27. */
   readonly subtypes: readonly string[];
-  /** Vuoto su tutto il catalogo al 2026-08-27. */
   readonly retreat_cost: readonly string[];
-  /** Vuoto su tutto il catalogo al 2026-08-27. */
+  readonly converted_retreat_cost: number | null;
   readonly rules: readonly string[];
-  /** Vuoto su tutto il catalogo al 2026-08-27. */
   readonly flavor_text: string | null;
-  /** Popolato solo su parte dell'era Scarlet & Violet. */
   readonly types: readonly string[];
-  /** Popolato solo su parte dell'era Scarlet & Violet. */
   readonly national_pokedex_numbers: readonly number[];
 }
 
@@ -168,17 +169,27 @@ export interface Artist {
   readonly slug: string;
   readonly name: string;
   readonly card_count: number;
+  /** Solo su `artists.get()`: la ricerca gia' scritta delle sue carte. */
+  readonly links?: { readonly cards?: string };
 }
 
 export interface CatalogStatus {
   readonly status: string;
-  readonly catalog: { readonly sets: number; readonly cards: number; readonly sealed: number };
+  readonly catalog: {
+    readonly sets: number;
+    readonly cards: number;
+    readonly sealed: number;
+    readonly artists: number;
+  };
   readonly sources: readonly {
     readonly source: string;
     readonly last_success_at: string | null;
     readonly age_hours: number | null;
-    readonly status: string;
+    /** `fresh`, `stale`, `critical` o `never_run`. */
+    readonly state: string;
   }[];
+  readonly upstream: { readonly contract_ok: boolean; readonly error: string | null };
+  readonly version: string;
 }
 
 export interface Health {
@@ -195,6 +206,12 @@ export interface CollectionMeta {
   readonly count: number;
   readonly total_count?: number;
   readonly has_more: boolean;
+  /**
+   * Cio' che la risposta ha tenuto fuori: `"index"` quando `select` nomina
+   * `index_eur` senza `include: ['index']`, o le righe prezzo che il piano non
+   * copre con `include: ['prices']`.
+   */
+  readonly withheld?: readonly string[];
 }
 
 export interface Collection<T> {
@@ -203,15 +220,24 @@ export interface Collection<T> {
   readonly links?: { readonly next?: string };
 }
 
+export interface MissingCard {
+  readonly id: string;
+  /** Present only for an existing historical alias in a different canonical set. */
+  readonly suggested_id?: string;
+}
+
 export interface BatchResult<T> {
   readonly data: readonly T[];
   readonly requested: number;
   readonly found: number;
+  /** Absent when every requested id resolves; repeated ids appear once. */
+  readonly missing?: readonly MissingCard[];
+  readonly withheld?: readonly string[];
 }
 
 // ── parametri ───────────────────────────────────────────────────────────────
 
-export type CardInclude = 'index' | 'prices' | 'legalities' | 'translations' | 'images' | 'set' | 'artist';
+export type CardInclude = 'index' | 'prices' | 'translations' | 'images' | 'set' | 'artist';
 
 export interface ListParams {
   /**
@@ -231,13 +257,224 @@ export interface CardListParams extends ListParams {
   readonly include?: readonly CardInclude[] | string;
   /** Sostituisce `name` con il nome nella lingua chiesta; ripiega su `en`. */
   readonly lang?: Locale;
-  /** Codice del set, come scorciatoia al posto di `q=set.code:...`. */
-  readonly set?: string;
+  /** Uno o piu' set per codice, slug o id alternativo, al posto di `q=set.id:...`. */
+  readonly set?: string | readonly string[];
 }
 
 export interface SetListParams extends ListParams {
   readonly region?: PrintRegion;
   readonly series?: string;
+  readonly lang?: Locale;
+}
+
+// ── serie e sigillati ───────────────────────────────────────────────────────
+
+export interface Series {
+  readonly id: string;
+  readonly slug: string;
+  readonly name: string;
+  readonly set_count: number;
+}
+
+export interface SealedProduct {
+  readonly id: string;
+  readonly sku: string;
+  readonly slug: string;
+  readonly name: string;
+  /** `BOOSTER_BOX` e simili. */
+  readonly kind: string;
+  readonly set_code: string | null;
+  readonly set_name: string | null;
+  readonly image_url: string | null;
+  readonly release_date: string | null;
+  readonly pack_count: number | null;
+  readonly languages: readonly string[];
+  /** Sulle liste solo con `include: ['index']`; sul prodotto singolo sempre. */
+  readonly index_eur?: number | null;
+  readonly last_price_at?: string | null;
+  readonly created_at: string;
+  readonly updated_at: string;
+}
+
+export interface SealedListParams {
+  readonly q?: string;
+  readonly set?: string | readonly string[];
+  readonly kind?: string;
+  readonly lang?: Locale;
+  readonly include?: readonly 'index'[] | 'index';
+  readonly orderBy?: string;
+  readonly limit?: number;
+  readonly cursor?: string;
+}
+
+// ── prezzi ──────────────────────────────────────────────────────────────────
+
+export interface PriceIndex {
+  readonly eur: number;
+  readonly as_of: string;
+  readonly sample_n: number | null;
+  /** Una serie per (lingua, stampa): l'indice di testa e' quello inglese. */
+  readonly by_locale: readonly {
+    readonly locale: string;
+    readonly printing: string | null;
+    readonly eur: number;
+    readonly as_of: string;
+    readonly sample_n: number | null;
+  }[];
+}
+
+export interface PriceFilterParams {
+  readonly source?: PriceSource | string;
+  readonly variant?: string;
+  readonly locale?: Locale | string;
+}
+
+export interface CardPrices {
+  readonly card_id: string;
+  readonly index: PriceIndex | null;
+  readonly quotes: readonly Price[];
+}
+
+export interface SealedPrices {
+  readonly sealed_id: string;
+  readonly index: PriceIndex | null;
+  readonly quotes: readonly Price[];
+}
+
+export interface PricesResponse<T> {
+  readonly data: T;
+  readonly meta: {
+    readonly quotes: number;
+    readonly delayed_hours: number;
+    /** Le righe che il piano non copre: `graded`, `non_english_locales`. Assente se niente e' trattenuto. */
+    readonly withheld?: readonly string[];
+  };
+}
+
+export interface HistoryParams extends PriceFilterParams {
+  readonly printing?: string;
+  /** `YYYY-MM-DD`. Una finestra piu' larga del piano da' `UpgradeRequiredError`. */
+  readonly from?: string;
+  readonly to?: string;
+  readonly bucket?: 'day' | 'week' | 'month';
+}
+
+export interface HistoryPoint {
+  readonly date: string;
+  readonly source: PriceSource | string;
+  readonly variant: string;
+  readonly locale: string | null;
+  readonly printing: string | null;
+  readonly amount: number;
+  readonly currency: string;
+  readonly sample_n: number | null;
+}
+
+export interface HistoryResponse {
+  readonly data: readonly HistoryPoint[];
+  readonly meta: {
+    readonly card_id: string;
+    readonly from: string;
+    readonly to: string;
+    readonly bucket: string;
+    readonly count: number;
+    readonly truncated: boolean;
+    readonly capped: boolean;
+    /** `null` quando il piano da' la storia intera. */
+    readonly plan_window_days: number | null;
+  };
+}
+
+export interface PriceStats {
+  readonly window: string;
+  readonly from: string;
+  readonly to: string;
+  readonly low: number | null;
+  readonly high: number | null;
+  readonly median: number | null;
+  readonly first: number | null;
+  readonly last: number | null;
+  readonly change_pct: number | null;
+  readonly sample_n: number;
+  readonly currency: string;
+}
+
+export interface StatsResponse {
+  readonly data: PriceStats;
+  readonly meta: { readonly card_id: string; readonly source: string };
+}
+
+export interface MoversParams {
+  readonly window?: string;
+  readonly direction?: 'gainers' | 'losers';
+  /** Valore minimo in euro, per tenere fuori le carte da pochi centesimi. */
+  readonly min_value?: number;
+  readonly locale?: Locale | string;
+  /** 1..50. */
+  readonly limit?: number;
+}
+
+export interface Mover {
+  readonly card_id: string;
+  readonly name: string;
+  readonly set_code: string;
+  readonly from: number;
+  readonly to: number;
+  readonly change_pct: number;
+  readonly currency: string;
+}
+
+export interface MoversResponse {
+  readonly data: readonly Mover[];
+  readonly meta: {
+    readonly window: string;
+    readonly from: string;
+    readonly to: string;
+    readonly direction: string;
+    readonly min_value: number;
+    readonly count: number;
+    readonly source: string;
+  };
+}
+
+export interface PriceSourceInfo {
+  readonly source: PriceSource | string;
+  readonly label: string;
+  readonly min_delay_hours: number;
+  readonly is_own: boolean;
+}
+
+// ── feed incrementale ───────────────────────────────────────────────────────
+
+export interface Change {
+  readonly id: number;
+  /** `SET`, `CARD`, ...: l'elenco vero e' `change_kinds` in `/v1/reference`. */
+  readonly kind: string;
+  readonly entity_id: string;
+  readonly op: string;
+  readonly version: number;
+  readonly changed_at: string;
+}
+
+export interface ChangesParams {
+  /** L'ultimo `next_since` ricevuto. Assente = dall'inizio disponibile. */
+  readonly since?: number;
+  readonly kind?: string;
+  readonly limit?: number;
+}
+
+export interface ChangesResponse {
+  readonly data: readonly Change[];
+  readonly meta: {
+    readonly count: number;
+    readonly has_more: boolean;
+    /** Da salvare e rimandare come `since`: il feed non ha altro stato. */
+    readonly next_since: number;
+    readonly watermark: number;
+    readonly oldest_available: number;
+    readonly behind: number;
+  };
+  readonly links?: { readonly next?: string };
 }
 
 // ── riconoscimento da foto ──────────────────────────────────────────────────

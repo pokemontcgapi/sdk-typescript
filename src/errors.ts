@@ -47,7 +47,20 @@ export class AuthenticationError extends PokemonTcgApiError {}
 /** 403 — la chiave e' valida ma non puo' fare questa cosa. */
 export class PermissionDeniedError extends PokemonTcgApiError {}
 
-/** 402 / UPGRADE_REQUIRED — serve un piano superiore. */
+/**
+ * 403 PLAN_REQUIRED — la rotta non e' nel piano (movers e foto partono da
+ * Growth). Estende `PermissionDeniedError`: chi gia' la catturava continua a
+ * farlo, chi vuole distinguere "compra" da "scope sbagliato" ora puo'.
+ */
+export class PlanRequiredError extends PermissionDeniedError {}
+
+/**
+ * 403 TRIAL_EXPIRED — la prova e' finita (30 giorni) e la rotta costa crediti.
+ * Non passa aspettando ne' riprovando: serve un piano.
+ */
+export class TrialExpiredError extends PermissionDeniedError {}
+
+/** 403 UPGRADE_REQUIRED — la finestra chiesta e' piu' larga di quella del piano. */
 export class UpgradeRequiredError extends PokemonTcgApiError {
   /** Finestra concessa dal piano corrente, quando l'API la dichiara. */
   get permittedWindow(): unknown {
@@ -112,8 +125,10 @@ export class ApiTimeoutError extends ApiConnectionError {
 export function toApiError(status: number, body: ApiErrorBody, retryAfter?: number): PokemonTcgApiError {
   const code = body.code;
 
-  if (code === 'QUOTA_EXCEEDED' || code === 'MONTHLY_QUOTA_EXCEEDED') return new QuotaExceededError(status, body);
-  if (code === 'UPGRADE_REQUIRED' || status === 402) return new UpgradeRequiredError(status, body);
+  if (code === 'QUOTA_EXCEEDED') return new QuotaExceededError(status, body);
+  if (code === 'UPGRADE_REQUIRED') return new UpgradeRequiredError(status, body);
+  if (code === 'PLAN_REQUIRED') return new PlanRequiredError(status, body);
+  if (code === 'TRIAL_EXPIRED') return new TrialExpiredError(status, body);
   if (status === 429) return new RateLimitedError(status, body, retryAfter);
   if (status === 401) return new AuthenticationError(status, body);
   if (status === 403) return new PermissionDeniedError(status, body);

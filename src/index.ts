@@ -1,25 +1,40 @@
-import { HttpClient, Page, type ClientOptions } from './client.js';
+import { HttpClient, Page, type ClientOptions, type ResponseInfo } from './client.js';
 import type {
   Artist,
   BatchResult,
   Card,
   CardInclude,
   CardListParams,
+  CardPrices,
   CardSet,
   CatalogStatus,
+  ChangesParams,
+  ChangesResponse,
   Collection,
   Health,
+  HistoryParams,
+  HistoryResponse,
   IdentifyOptions,
   ListParams,
   Locale,
+  MoversParams,
+  MoversResponse,
+  PriceFilterParams,
+  PriceSourceInfo,
+  PricesResponse,
+  SealedListParams,
+  SealedPrices,
+  SealedProduct,
+  Series,
   SetListParams,
+  StatsResponse,
   VisionResponse,
 } from './types.js';
 
 export * from './errors.js';
 export * from './types.js';
 export { Page } from './client.js';
-export type { ClientOptions } from './client.js';
+export type { ClientOptions, ResponseInfo } from './client.js';
 
 /**
  * Client di pokemontcgapi.com.
@@ -46,6 +61,9 @@ export class PokemonTcgApi {
   readonly cards: CardsResource;
   readonly sets: SetsResource;
   readonly artists: ArtistsResource;
+  readonly series: SeriesResource;
+  readonly sealed: SealedResource;
+  readonly prices: PricesResource;
   readonly reference: ReferenceResource;
   readonly vision: VisionResource;
 
@@ -54,8 +72,28 @@ export class PokemonTcgApi {
     this.cards = new CardsResource(this.http);
     this.sets = new SetsResource(this.http);
     this.artists = new ArtistsResource(this.http);
+    this.series = new SeriesResource(this.http);
+    this.sealed = new SealedResource(this.http);
+    this.prices = new PricesResource(this.http);
     this.reference = new ReferenceResource(this.http);
     this.vision = new VisionResource(this.http);
+  }
+
+  /**
+   * Gli header dell'ultima risposta: crediti scalati, quota rimasta e cio' che
+   * il piano ha trattenuto (`planWithheld`). Con richieste concorrenti e'
+   * l'ultima arrivata: per contarle tutte si usa `onResponse` nelle opzioni.
+   */
+  get lastResponse(): ResponseInfo | null {
+    return this.http.lastResponse;
+  }
+
+  /**
+   * Il feed incrementale: cosa e' cambiato dopo `since`. Si salva
+   * `meta.next_since` e lo si rimanda alla chiamata dopo.
+   */
+  changes(params: ChangesParams = {}): Promise<ChangesResponse> {
+    return this.http.get<ChangesResponse>('/v1/changes', { ...params });
   }
 
   /** Conteggi di catalogo e freschezza per fonte. */
@@ -89,9 +127,9 @@ class CardsResource {
   /**
    * Fino a 100 id in una richiesta.
    *
-   * La risposta porta `requested` e `found`: gli id che non esistono vengono
-   * semplicemente omessi da `data`, non segnalati uno per uno. Confrontare i due
-   * numeri e' l'unico modo di accorgersene, quindi il tipo li espone entrambi.
+   * La risposta porta `requested` e `found`, e quando qualcosa non si risolve
+   * anche `missing`: un elemento per id, con `suggested_id` dove l'id e' un
+   * alias storico di una carta che oggi sta in un altro set.
    */
   batch(
     ids: readonly string[],
@@ -119,8 +157,8 @@ class SetsResource {
   }
 
   /** Un set per codice, slug o id alternativo. */
-  get(code: string): Promise<CardSet> {
-    return this.http.get<CardSet>(`/v1/sets/${encodeURIComponent(code)}`);
+  get(code: string, params: { lang?: Locale } = {}): Promise<CardSet> {
+    return this.http.get<CardSet>(`/v1/sets/${encodeURIComponent(code)}`, { ...params });
   }
 
   /** Le carte di un set, in ordine di collezione. */
@@ -143,6 +181,86 @@ class ArtistsResource {
   }
 }
 
+class SeriesResource {
+  constructor(private readonly http: HttpClient) {}
+
+  /** Le serie (Scarlet & Violet, Sword & Shield, ...) con il numero di set. */
+  async list(params: { orderBy?: string; limit?: number; cursor?: string } = {}): Promise<Page<Series>> {
+    const body = await this.http.get<Collection<Series>>('/v1/series', { ...params });
+    return new Page(this.http, body);
+  }
+}
+
+/** Prodotti sigillati: booster box, ETB, tin, blister, collezioni. */
+class SealedResource {
+  constructor(private readonly http: HttpClient) {}
+
+  async list(params: SealedListParams = {}): Promise<Page<SealedProduct>> {
+    const body = await this.http.get<Collection<SealedProduct>>('/v1/sealed', { ...params });
+    return new Page(this.http, body);
+  }
+
+  get(id: string, params: { lang?: Locale } = {}): Promise<SealedProduct> {
+    return this.http.get<SealedProduct>(`/v1/sealed/${encodeURIComponent(id)}`, { ...params });
+  }
+
+  /** Prezzi correnti di un prodotto. 2 crediti. L'indice composito non copre i sigillati: `index` e' `null`. */
+  prices(id: string, params: PriceFilterParams = {}): Promise<PricesResponse<SealedPrices>> {
+    return this.http.get<PricesResponse<SealedPrices>>(`/v1/sealed/${encodeURIComponent(id)}/prices`, { ...params });
+  }
+}
+
+/**
+ * Le rotte prezzi dedicate.
+ *
+ * Ogni riga dice da dove viene (`source`), su cosa poggia (`basis`: venduto,
+ * richiesto, guida, derivato) e di che giorno e' (`as_of`). Le righe che il
+ * piano non copre mancano dal corpo: `client.lastResponse.planWithheld` dice
+ * quali.
+ */
+class PricesResource {
+  constructor(private readonly http: HttpClient) {}
+
+  /** Indice e quotazioni correnti di una carta. 2 crediti. */
+  card(id: string, params: PriceFilterParams = {}): Promise<PricesResponse<CardPrices>> {
+    return this.http.get<PricesResponse<CardPrices>>(`/v1/cards/${encodeURIComponent(id)}/prices`, { ...params });
+  }
+
+  /** Fino a 50 carte in una chiamata, 4 crediti ogni 25. */
+  current(ids: readonly string[], params: PriceFilterParams = {}): Promise<BatchResult<CardPrices>> {
+    if (ids.length === 0) return Promise.resolve({ data: [], requested: 0, found: 0 });
+    if (ids.length > 50) {
+      throw new RangeError(`prices.current() accepts at most 50 ids, received ${ids.length}. Chunk the list.`);
+    }
+    return this.http.get<BatchResult<CardPrices>>('/v1/prices/current', { ids, ...params });
+  }
+
+  /**
+   * Storia giornaliera. 5 crediti. La finestra dipende dal piano (7 giorni in
+   * prova, 30 su Developer, intera da Growth): chiederne una piu' larga da'
+   * `UpgradeRequiredError` con `permittedWindow`.
+   */
+  history(id: string, params: HistoryParams = {}): Promise<HistoryResponse> {
+    return this.http.get<HistoryResponse>(`/v1/cards/${encodeURIComponent(id)}/prices/history`, { ...params });
+  }
+
+  /** Minimo, massimo, mediana e variazione dell'indice su una finestra. 2 crediti. */
+  stats(id: string, params: { window?: string; locale?: Locale | string } = {}): Promise<StatsResponse> {
+    return this.http.get<StatsResponse>(`/v1/cards/${encodeURIComponent(id)}/prices/stats`, { ...params });
+  }
+
+  /** Le carte che si sono mosse di piu'. 3 crediti, dal piano Growth (`PlanRequiredError` sotto). */
+  movers(params: MoversParams = {}): Promise<MoversResponse> {
+    return this.http.get<MoversResponse>('/v1/prices/movers', { ...params });
+  }
+
+  /** Le fonti, con il ritardo dichiarato di ciascuna. Gratuita. */
+  async sources(): Promise<readonly PriceSourceInfo[]> {
+    const body = await this.http.get<{ data: readonly PriceSourceInfo[] }>('/v1/prices/sources');
+    return body.data;
+  }
+}
+
 /**
  * I vocabolari, per popolare i filtri di una UI senza indovinare le stringhe.
  *
@@ -161,7 +279,13 @@ class ReferenceResource {
 
   private pending: Promise<Record<string, readonly string[]>> | null = null;
 
-  private all(): Promise<Record<string, readonly string[]>> {
+  /**
+   * Tutti i vocabolari in una volta: oltre ai quattro qui sotto, `locales`,
+   * `print_regions`, `conditions`, `printings`, `grading_companies`,
+   * `price_variants`, `price_bases`, `change_kinds` e gli altri che
+   * `/v1/reference` elenca.
+   */
+  all(): Promise<Record<string, readonly string[]>> {
     // La promise, non il valore: due chiamate ravvicinate condividono una
     // richiesta sola invece di farne due e tenere l'ultima.
     this.pending ??= this.http
