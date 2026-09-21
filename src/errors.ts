@@ -13,6 +13,25 @@
  * primo e non riprova mai il secondo.
  */
 
+export interface NextStep {
+  readonly action: 'subscribe' | 'upgrade' | 'contact_sales' | 'contact_support' | 'verify_email';
+  readonly actor: 'account_owner';
+  readonly plan?: {
+    readonly code: string;
+    readonly name: string;
+    readonly monthly_eur?: string;
+    readonly yearly_eur?: string;
+    readonly credits_per_month?: number;
+  };
+  readonly checkout_url?: string;
+  readonly checkout_url_yearly?: string;
+  readonly manage_url?: string;
+  readonly contact_url?: string;
+  readonly verify_url?: string;
+  readonly plans_url: string;
+  readonly handoff: string;
+}
+
 export interface ApiErrorBody {
   readonly code: string;
   readonly message: string;
@@ -30,6 +49,37 @@ export class PokemonTcgApiError extends Error {
    */
   readonly requestId: string | undefined;
   readonly details: Record<string, unknown> | undefined;
+
+  get nextStep(): NextStep | undefined {
+    const value = this.details?.['next_step'];
+    if (typeof value !== 'object' || value === null) return undefined;
+    const step = value as Record<string, unknown>;
+    if (step['actor'] !== 'account_owner' || typeof step['handoff'] !== 'string' ||
+        typeof step['plans_url'] !== 'string' ||
+        !['subscribe', 'upgrade', 'contact_sales', 'contact_support', 'verify_email'].includes(String(step['action']))) {
+      return undefined;
+    }
+    return value as NextStep;
+  }
+
+  get checkoutUrl(): string | undefined {
+    const value = this.nextStep?.checkout_url;
+    return typeof value === 'string' ? value : undefined;
+  }
+
+  get actionUrl(): string | undefined {
+    const step = this.nextStep;
+    if (!step) return undefined;
+    const value = step.action === 'subscribe' ? step.checkout_url
+      : step.action === 'upgrade' ? step.manage_url
+      : step.action === 'verify_email' ? step.verify_url
+      : step.contact_url;
+    return typeof value === 'string' ? value : undefined;
+  }
+
+  get handoff(): string | undefined {
+    return this.nextStep?.handoff;
+  }
 
   constructor(status: number, body: ApiErrorBody) {
     super(`${body.code}: ${body.message}`);

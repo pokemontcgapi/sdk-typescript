@@ -20,16 +20,26 @@ their respective owners.
 
 ## Get a key
 
-One call, no dashboard and no card:
+Generate the Idempotency-Key once per signup and keep it with the request body:
+
+```bash
+IDEM=$(uuidgen)
+```
 
 ```bash
 curl -s -X POST "https://api.pokemontcgapi.com/v1/accounts/free" \
   -H "Content-Type: application/json" \
-  -H "Idempotency-Key: $(uuidgen)" \
+  -H "Idempotency-Key: $IDEM" \
   -d '{"email":"you@example.com"}'
 ```
 
-The key comes back once, in `data.key.secret`. Confirming the address we email raises the trial from
+Lost the response? Repeat the exact same request (same Idempotency-Key, same body byte for byte, same network: same public IPv4 or the same IPv6 /64) within 24 hours and the response comes back, if stored, secret included; it is the original response, so a key rotated or revoked since then is not revived. A new Idempotency-Key for the same email returns 409 ACCOUNT_EXISTS; the same key with a different body returns 409 IDEMPOTENCY_CONFLICT.
+
+We store only a hash of the key; the signup response is kept for 24 hours so the same request can be replayed. Save `data.key.secret` now.
+
+If replay is unavailable, [sign in](https://pokemontcgapi.com/account) and rotate the key, or use /v1/accounts/recover with an already verified email to get a new secret.
+
+The key comes back in `data.key.secret`. Confirming the address we email raises the trial from
 80 to 800 credits, and the trial ends 30 days after signup. Paid plans start at 29 EUR a month:
 [pricing](https://pokemontcgapi.com/pricing).
 
@@ -175,6 +185,14 @@ try {
 Every error carries `code`, `status`, `details` and `requestId` — quote the request id in a support
 message, it is the only thing that can be looked up. Retries use exponential backoff with full
 jitter on 429, 5xx and network failures, honour `Retry-After`, and never retry a quota exhaustion.
+
+Commercial refusals include `details.next_step`, exposed as the typed `err.nextStep`. If `err.nextStep` exists, show `err.nextStep.handoff` and its URL to the account owner verbatim and do not retry. `err.actionUrl` returns the URL for any action: `checkout_url` for subscribe, `manage_url` for upgrade, `verify_url` for email verification, or `contact_url` for sales and support. Show it alongside `err.handoff`. Upgrades point to the account page, where the owner opens the billing portal to change plan. `err.checkoutUrl` remains a shortcut for subscribe only.
+
+```ts
+if (err instanceof PokemonTcgApiError && err.nextStep) {
+  showToUser(err.nextStep.handoff);
+}
+```
 
 ## What this API does not have
 
