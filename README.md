@@ -1,5 +1,7 @@
 # @pokemontcgapi/sdk
 
+[![npm](https://img.shields.io/npm/v/%40pokemontcgapi%2Fsdk)](https://www.npmjs.com/package/@pokemontcgapi/sdk) [![license](https://img.shields.io/npm/l/%40pokemontcgapi%2Fsdk)](./LICENSE) [![CI](https://github.com/pokemontcgapi/sdk-typescript/actions/workflows/ci.yml/badge.svg)](https://github.com/pokemontcgapi/sdk-typescript/actions/workflows/ci.yml)
+
 TypeScript client for the Pokémon TCG API at [pokemontcgapi.com](https://pokemontcgapi.com): cards,
 sets, illustrators, the reference vocabularies and photo recognition, across three print lines,
 international, Japanese and Simplified Chinese, with card names in eight locales, images, and prices
