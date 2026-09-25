@@ -55,6 +55,8 @@ export interface ResponseInfo {
   readonly url: string;
   readonly status: number;
   readonly requestId: string | null;
+  /** Uguale a error.code negli errori API; assente sulle risposte riuscite. */
+  readonly errorCode: string | null;
   /** Crediti scalati da questa chiamata. 0 su rotte gratuite, 304 ed errori del client. */
   readonly creditsCost: number | null;
   readonly quotaLimit: number | null;
@@ -80,6 +82,7 @@ function toResponseInfo(url: string, response: Response): ResponseInfo {
     url,
     status: response.status,
     requestId: h.get('x-request-id'),
+    errorCode: h.get('x-error-code'),
     creditsCost: headerNumber(h, 'x-credits-cost'),
     quotaLimit: headerNumber(h, 'x-quota-limit'),
     quotaRemaining: headerNumber(h, 'x-quota-remaining'),

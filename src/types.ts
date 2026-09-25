@@ -35,7 +35,11 @@ export type PriceSource =
 export type PriceBasis = 'GUIDE' | 'DERIVED' | 'SOLD' | 'ASKING';
 
 export interface Grading {
-  readonly company: string;
+  /**
+   * Null when the source publishes a grade band valid for any grader
+   * (PriceCharting's "grade 9"). A graded row is `grading !== null`.
+   */
+  readonly company: string | null;
   readonly score: string;
 }
 
@@ -212,7 +216,38 @@ export interface CollectionMeta {
    * copre con `include: ['prices']`.
    */
   readonly withheld?: readonly string[];
+  /** Grace-period parameter warnings; distinct from search suggestions. */
+  readonly warnings?: readonly string[];
+  /** Presente quando una ricerca per numero o nome di set ha un suggerimento utile. */
+  readonly hints?: readonly SearchHint[];
 }
+
+export type SearchHint =
+  | {
+      readonly code: 'NUMBER_NORMALIZED';
+      readonly message: string;
+      readonly received: string;
+      readonly matched: string;
+    }
+  | {
+      readonly code: 'TRY_POKEDEX_NUMBER';
+      readonly message: string;
+      readonly suggested_q: string;
+      /** Capped at 50; read at_least when the actual count is higher. */
+      readonly matches: number;
+      readonly at_least?: boolean;
+    }
+  | {
+      readonly code: 'SET_ALIAS_MATCHED' | 'SET_WORDS_MATCHED';
+      readonly message: string;
+      readonly matched: string;
+    }
+  | {
+      readonly code: 'SET_ALIAS_ELSEWHERE';
+      readonly message: string;
+      readonly set_code: string;
+      readonly set_name: string;
+    };
 
 export interface Collection<T> {
   readonly data: readonly T[];
@@ -261,7 +296,7 @@ export interface CardListParams extends ListParams {
   readonly set?: string | readonly string[];
 }
 
-export interface SetListParams extends ListParams {
+export interface SetListParams extends Omit<ListParams, 'select'> {
   readonly region?: PrintRegion;
   readonly series?: string;
   readonly lang?: Locale;
@@ -508,6 +543,7 @@ export interface VisionCandidate {
 
 export interface VisionResult {
   readonly decision: VisionDecision;
+  readonly decision_reason: 'clear' | 'reprint' | 'close_call' | 'none' | 'ocr_number' | 'ocr_set_number';
   /** Valorizzato SOLO quando `decision` e' `match`. Altrimenti `null`. */
   readonly id: string | null;
   readonly candidates: readonly VisionCandidate[];
@@ -517,6 +553,7 @@ export interface VisionMeta {
   readonly count: number;
   readonly cards_indexed: number;
   readonly index_built_at: string;
+  readonly index_loaded_at: string;
   readonly signature_version: number;
   /**
    * Quanti quadrilateri simili a una carta sono stati isolati nella foto. Zero
@@ -527,6 +564,17 @@ export interface VisionMeta {
   readonly regions_detected: number;
   readonly hypotheses_tried: number;
   readonly elapsed_ms: number;
+  readonly ocr?: {
+    readonly applied: boolean;
+    readonly eligible: number;
+    readonly level?: 1 | 2;
+    readonly number?: number;
+    readonly ms: number;
+    readonly crop_ms: number;
+    readonly reason?: 'no_text' | 'no_fraction' | 'no_match' | 'multiple' | 'timeout' | 'disabled' | 'error';
+    readonly set_code?: string;
+    readonly set_reason?: 'no_token' | 'no_match' | 'multiple' | 'timeout' | 'error';
+  };
 }
 
 export interface VisionResponse {

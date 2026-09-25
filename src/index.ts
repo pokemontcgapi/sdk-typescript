@@ -162,7 +162,7 @@ class SetsResource {
   }
 
   /** Le carte di un set, in ordine di collezione. */
-  async cards(code: string, params: CardListParams = {}): Promise<Page<Card>> {
+  async cards(code: string, params: Omit<CardListParams, 'set'> = {}): Promise<Page<Card>> {
     const body = await this.http.get<Collection<Card>>(`/v1/sets/${encodeURIComponent(code)}/cards`, { ...params });
     return new Page(this.http, body);
   }
@@ -171,7 +171,7 @@ class SetsResource {
 class ArtistsResource {
   constructor(private readonly http: HttpClient) {}
 
-  async list(params: ListParams = {}): Promise<Page<Artist>> {
+  async list(params: Omit<ListParams, 'select'> = {}): Promise<Page<Artist>> {
     const body = await this.http.get<Collection<Artist>>('/v1/artists', { ...params });
     return new Page(this.http, body);
   }

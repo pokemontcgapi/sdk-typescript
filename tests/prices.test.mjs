@@ -29,6 +29,7 @@ test('le rotte prezzi chiamano i path giusti e gli header restano leggibili', as
   ]);
   assert.equal(client.lastResponse?.creditsCost, 4);
   assert.equal(client.lastResponse?.quotaRemaining, 796);
+  assert.equal(client.lastResponse?.errorCode, null);
   assert.deepEqual(client.lastResponse?.planWithheld, ['graded', 'non_english_locales']);
 });
 
@@ -36,12 +37,13 @@ test('PLAN_REQUIRED e TRIAL_EXPIRED hanno una classe, e restano PermissionDenied
   const cases = /** @type {const} */ ([{ code: 'PLAN_REQUIRED', cls: PlanRequiredError }, { code: 'TRIAL_EXPIRED', cls: TrialExpiredError }]);
   for (const { code, cls } of cases) {
     const client = new PokemonTcgApi({ apiKey: 'test', maxRetries: 0, fetch: async () =>
-      new Response(JSON.stringify({ error: { code, message: 'no' } }), { status: 403 }) });
+      new Response(JSON.stringify({ error: { code, message: 'no' } }), { status: 403, headers: { 'X-Error-Code': code } }) });
     await assert.rejects(client.prices.movers(), (error) => {
       assert.ok(error instanceof cls);
       assert.ok(error instanceof PermissionDeniedError);
       return true;
     });
+    assert.equal(client.lastResponse?.errorCode, code);
   }
 });
 
