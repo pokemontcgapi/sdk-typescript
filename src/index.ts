@@ -355,6 +355,7 @@ class VisionResource {
     if (options.topK !== undefined) form.set('top_k', String(options.topK));
     if (options.set !== undefined) form.set('set', options.set);
     if (options.region !== undefined) form.set('region', options.region);
+    if (options.include !== undefined) form.set('include', options.include.join(','));
 
     // Nessun content-type esplicito: il boundary del multipart lo scrive fetch,
     // e impostarlo a mano produce un corpo che il server non riesce a separare.

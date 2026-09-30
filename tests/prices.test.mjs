@@ -8,7 +8,7 @@ test('le rotte prezzi chiamano i path giusti e gli header restano leggibili', as
     const url = new URL(String(input));
     seen.push(url.pathname + url.search);
     return new Response(JSON.stringify({ data: [], meta: {}, requested: 0, found: 0 }), {
-      headers: { 'x-credits-cost': '4', 'x-quota-remaining': '796', 'x-plan-withheld': 'graded, non_english_locales' },
+      headers: { 'x-credits-cost': '4', 'x-quota-remaining': '796', 'x-plan-withheld': 'graded, non_english_locales', 'x-cards-limit': '1000', 'x-cards-used': '37' },
     });
   }});
 
@@ -31,6 +31,8 @@ test('le rotte prezzi chiamano i path giusti e gli header restano leggibili', as
   assert.equal(client.lastResponse?.quotaRemaining, 796);
   assert.equal(client.lastResponse?.errorCode, null);
   assert.deepEqual(client.lastResponse?.planWithheld, ['graded', 'non_english_locales']);
+  assert.equal(client.lastResponse?.cardsLimit, 1000);
+  assert.equal(client.lastResponse?.cardsUsed, 37);
 });
 
 test('PLAN_REQUIRED e TRIAL_EXPIRED hanno una classe, e restano PermissionDenied', async () => {

@@ -66,6 +66,14 @@ export interface ResponseInfo {
   readonly planWithheld: readonly string[];
   /** Solo sulla prova: quando scade. */
   readonly trialExpiresAt: string | null;
+  /**
+   * Il tetto di carte distinte del periodo e quante ne sono gia' state
+   * servite PRIMA di questa risposta. Nulli da Growth in su, dove non c'e'
+   * tetto. Un 403 CARD_ALLOWANCE_EXCEEDED arriva quando `cardsUsed` e' al
+   * tetto e la richiesta porterebbe carte nuove.
+   */
+  readonly cardsLimit: number | null;
+  readonly cardsUsed: number | null;
 }
 
 function headerNumber(headers: Headers, name: string): number | null {
@@ -90,6 +98,8 @@ function toResponseInfo(url: string, response: Response): ResponseInfo {
     rateLimitRemaining: headerNumber(h, 'ratelimit-remaining'),
     planWithheld: withheld === null || withheld === '' ? [] : withheld.split(',').map((v) => v.trim()),
     trialExpiresAt: h.get('x-trial-expires-at'),
+    cardsLimit: headerNumber(h, 'x-cards-limit'),
+    cardsUsed: headerNumber(h, 'x-cards-used'),
   };
 }
 

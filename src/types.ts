@@ -531,6 +531,9 @@ export interface VisionCandidate {
   readonly set: { readonly code: string; readonly name: string; readonly print_region: PrintRegion };
   readonly rarity: string | null;
   readonly image_url: string | null;
+  readonly index_eur?: number | null;
+  readonly last_price_at?: string | null;
+  readonly prices?: readonly Price[];
   /**
    * Distanza di Hamming, 0..512. E' il numero su cui tarare una soglia propria:
    * le corrispondenze reali stanno sotto 150 anche su una foto rumorosa, e
@@ -580,6 +583,7 @@ export interface VisionMeta {
 export interface VisionResponse {
   readonly data: VisionResult;
   readonly meta: VisionMeta;
+  readonly withheld?: readonly string[];
 }
 
 export interface IdentifyOptions {
@@ -589,4 +593,5 @@ export interface IdentifyOptions {
   readonly set?: string;
   /** Restringe a una regione di stampa. Stesso scopo. */
   readonly region?: PrintRegion;
+  readonly include?: readonly ('index' | 'prices')[];
 }
