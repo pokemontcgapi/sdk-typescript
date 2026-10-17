@@ -1,6 +1,14 @@
 import { HttpClient, Page, type ClientOptions, type ResponseInfo } from './client.js';
 import type {
   Artist,
+  CenteringMeasureOptions,
+  CenteringMeasureResponse,
+  CenteringConfirmInput,
+  CenteringConfirmResponse,
+  CenteringGradeInput,
+  CenteringGradeResponse,
+  CenteringStandardsOptions,
+  CenteringStandardsResponse,
   BatchResult,
   Card,
   CardInclude,
@@ -66,6 +74,7 @@ export class PokemonTcgApi {
   readonly prices: PricesResource;
   readonly reference: ReferenceResource;
   readonly vision: VisionResource;
+  readonly centering: CenteringResource;
 
   constructor(options: ClientOptions = {}) {
     this.http = new HttpClient(options);
@@ -77,6 +86,7 @@ export class PokemonTcgApi {
     this.prices = new PricesResource(this.http);
     this.reference = new ReferenceResource(this.http);
     this.vision = new VisionResource(this.http);
+    this.centering = new CenteringResource(this.http);
   }
 
   /**
@@ -372,3 +382,33 @@ function toBlob(image: Blob | Uint8Array | ArrayBuffer): Blob {
 }
 
 export default PokemonTcgApi;
+
+/** Growth and higher; verified Free trial: 5 measure + 5 confirm, independently. */
+class CenteringResource {
+  constructor(private readonly http: HttpClient) {}
+
+  /** 25 credits. needs-review without ceilings is expected; show the geometry to a person. */
+  measure(image: Blob | Uint8Array | ArrayBuffer, options: CenteringMeasureOptions): Promise<CenteringMeasureResponse> {
+    const form = new FormData();
+    form.set('image', image instanceof Blob ? image : new Blob([image instanceof Uint8Array ? new Uint8Array(image) : image]), 'card');
+    form.set('face', options.face);
+    if (options.card_size !== undefined) form.set('card_size', options.card_size);
+    if (options.corners !== undefined) form.set('corners', JSON.stringify(options.corners));
+    return this.http.post<CenteringMeasureResponse>('/v1/centering/measure', form);
+  }
+
+  /** 5 credits. Call only after a person has checked the lines in your app. */
+  confirm(input: CenteringConfirmInput): Promise<CenteringConfirmResponse> {
+    return this.http.post<CenteringConfirmResponse>('/v1/centering/confirm', JSON.stringify(input), 'application/json');
+  }
+
+  /** 1 credit. Ceiling from centering alone, not a prediction of the final grade. */
+  grade(input: CenteringGradeInput): Promise<CenteringGradeResponse> {
+    return this.http.post<CenteringGradeResponse>('/v1/centering/grade', JSON.stringify(input), 'application/json');
+  }
+
+  /** 1 credit. Thresholds with sources and per-band status. */
+  standards(options: CenteringStandardsOptions = {}): Promise<CenteringStandardsResponse> {
+    return this.http.get<CenteringStandardsResponse>('/v1/centering/standards', { ...options });
+  }
+}
