@@ -257,7 +257,7 @@ export interface Collection<T> {
 
 export interface MissingCard {
   readonly id: string;
-  /** Present only for an existing historical alias in a different canonical set. */
+  /** Present only when the API identifies an existing candidate for an unresolved id. */
   readonly suggested_id?: string;
 }
 
@@ -595,3 +595,160 @@ export interface IdentifyOptions {
   readonly region?: PrintRegion;
   readonly include?: readonly ('index' | 'prices')[];
 }
+
+// Centering: hand-written from the P1 synthetic captures (centering-* fixtures).
+export type CenteringFace = 'front' | 'back';
+export type CenteringSize = 'standard' | 'small';
+export type CenteringHouse = 'PSA' | 'BGS' | 'CGC' | 'SGC';
+export type CenteringSourceStatus = 'official' | 'interpreted' | 'approximate';
+export type CenteringAxisName = 'lr' | 'tb';
+export interface CenteringPoint { readonly x: number; readonly y: number }
+export type CenteringCorners = readonly [CenteringPoint, CenteringPoint, CenteringPoint, CenteringPoint];
+export interface CenteringDimensions { readonly width: number; readonly height: number }
+export interface CenteringRectified extends CenteringDimensions { readonly rotations: number; readonly corner_offset: number }
+export interface CenteringLine { readonly intercept: number; readonly slope: number }
+export interface CenteringLineGroup {
+  readonly left: CenteringLine;
+  readonly right: CenteringLine;
+  readonly top: CenteringLine;
+  readonly bottom: CenteringLine;
+}
+export interface CenteringGeometry {
+  readonly geometry_version: 1;
+  readonly image: CenteringDimensions;
+  /** EXIF-oriented image pixels, longest edge <= 2560; TL, TR, BR, BL. */
+  readonly corners: CenteringCorners;
+  readonly rectified: CenteringRectified;
+  /** Rectified pixels including padding. Vertical x=i+s*y; horizontal y=i+s*x. */
+  readonly lines: { readonly cut: CenteringLineGroup; readonly print: CenteringLineGroup };
+  readonly card_size: CenteringSize;
+  readonly warnings: readonly string[];
+  readonly positioning_sigma?: number;
+}
+export interface CenteringCeiling {
+  readonly maximum_grade: number | null;
+  readonly label: string | null;
+  readonly rank: number | null;
+  readonly limiting_face: CenteringFace;
+  readonly limiting_axis: CenteringAxisName;
+  readonly distance_to_next: number | null;
+  readonly next_grade: number | null;
+  readonly next_label: string | null;
+  readonly borderline: boolean;
+  readonly unconstrained: boolean;
+  readonly source_status: CenteringSourceStatus;
+  readonly standard_status: CenteringSourceStatus;
+  readonly source: string;
+  readonly sources: readonly string[];
+  readonly reviewed_at: string;
+  readonly verification: string;
+}
+export interface CenteringAxis {
+  readonly ratio: string;
+  readonly major_percent: number;
+  readonly minor_percent: number;
+  readonly uncertainty_pp: number;
+  readonly sigma_pp: number;
+  readonly worst_station_px: number;
+  readonly stations_major_percent: readonly number[];
+}
+export interface CenteringNormalization {
+  readonly field: string;
+  readonly input?: number | string;
+  readonly ratio?: string;
+  readonly note: string;
+}
+export interface CenteringMeasureResult {
+  readonly status: 'ok' | 'needs-review' | 'failed';
+  readonly code: string;
+  readonly face: CenteringFace;
+  readonly card_size: CenteringSize;
+  readonly lr: CenteringAxis | null;
+  readonly tb: CenteringAxis | null;
+  readonly confidence: number | null;
+  readonly warnings: readonly string[];
+  readonly ceilings: Readonly<Record<CenteringHouse, CenteringCeiling>> | null;
+  readonly advice: string;
+  readonly elapsed_ms: number;
+  readonly normalizations: readonly CenteringNormalization[];
+  readonly image_bytes: number;
+  readonly summary: string;
+  readonly disclaimer: string;
+  readonly geometry?: CenteringGeometry;
+}
+export interface CenteringConfirmResult extends Omit<CenteringMeasureResult, 'geometry'> {
+  readonly status: 'ok';
+  readonly code: 'OK';
+  readonly basis: 'client-confirmed-lines';
+  readonly ceilings: Readonly<Record<CenteringHouse, CenteringCeiling>>;
+}
+export interface CenteringMeta { readonly elapsed_ms: number; readonly engine_version: string }
+export interface CenteringMeasureResponse { readonly data: CenteringMeasureResult; readonly meta: CenteringMeta }
+export interface CenteringConfirmResponse { readonly data: CenteringConfirmResult; readonly meta: CenteringMeta }
+export interface CenteringMeasureOptions {
+  readonly face: CenteringFace;
+  readonly card_size?: CenteringSize;
+  readonly corners?: CenteringCorners;
+}
+export interface CenteringConfirmInput {
+  readonly face: CenteringFace;
+  readonly card_size: CenteringSize;
+  readonly geometry: CenteringGeometry;
+  readonly confirmed_by: 'person';
+}
+export type CenteringRatio = number | string | readonly [number | string, number | string];
+export interface CenteringKnownFace { readonly lr?: CenteringRatio; readonly tb?: CenteringRatio }
+export interface CenteringGradeInput {
+  readonly front_lr?: CenteringRatio;
+  readonly front_tb?: CenteringRatio;
+  readonly back_lr?: CenteringRatio;
+  readonly back_tb?: CenteringRatio;
+  readonly front?: CenteringKnownFace;
+  readonly back?: CenteringKnownFace;
+  readonly house?: CenteringHouse;
+}
+export interface CenteringFaceGrade {
+  readonly ratios: { readonly lr: number | null; readonly tb: number | null };
+  readonly missing_axes: readonly CenteringAxisName[];
+  readonly ceilings: Readonly<Partial<Record<CenteringHouse, CenteringCeiling>>>;
+}
+export interface CenteringGradeResult {
+  readonly front: CenteringFaceGrade | null;
+  readonly back: CenteringFaceGrade | null;
+  readonly combined: Readonly<Partial<Record<CenteringHouse, CenteringCeiling>>>;
+  readonly normalizations: readonly CenteringNormalization[];
+  readonly incomplete: boolean;
+  readonly missing_faces: readonly CenteringFace[];
+  readonly summary: string;
+  readonly disclaimer: string;
+}
+export interface CenteringGradeResponse { readonly data: CenteringGradeResult; readonly meta: CenteringMeta }
+export interface CenteringBand {
+  readonly value: number;
+  readonly label: string;
+  readonly rank: number;
+  readonly loose: number;
+  readonly tight?: number;
+  readonly status: CenteringSourceStatus;
+}
+export interface CenteringStandard {
+  readonly house: CenteringHouse;
+  readonly face: CenteringFace;
+  readonly bands: readonly CenteringBand[];
+  readonly source: string;
+  readonly sources: readonly string[];
+  readonly status: CenteringSourceStatus;
+  readonly reviewed_at: string;
+  readonly verification: string;
+  readonly note: string;
+}
+export interface CenteringStandardsResult {
+  readonly normalizations: readonly CenteringNormalization[];
+  readonly standards: readonly CenteringStandard[];
+  readonly rounding_rule: string;
+  readonly tag_note: string;
+  readonly summary: string;
+  readonly disclaimer: string;
+}
+export interface CenteringStandardsResponse { readonly data: CenteringStandardsResult; readonly meta: CenteringMeta }
+export interface CenteringStandardsOptions { readonly house?: CenteringHouse; readonly face?: CenteringFace }
