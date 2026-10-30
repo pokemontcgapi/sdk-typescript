@@ -1,6 +1,14 @@
 import assert from 'node:assert/strict';
+import { existsSync, readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { PlanRequiredError, PermissionDeniedError, PokemonTcgApi, TrialExpiredError } from '../dist/index.js';
+
+/** Le fixture condivise: in packages/fixtures nel monorepo, in tests/fixtures nel repo pubblico. */
+function fixture(name) {
+  const local = new URL(`./fixtures/${name}.json`, import.meta.url);
+  const shared = new URL(`../../fixtures/${name}.json`, import.meta.url);
+  return JSON.parse(readFileSync(existsSync(local) ? local : shared, 'utf8'));
+}
 
 test('le rotte prezzi chiamano i path giusti e gli header restano leggibili', async () => {
   const seen = [];
@@ -8,7 +16,7 @@ test('le rotte prezzi chiamano i path giusti e gli header restano leggibili', as
     const url = new URL(String(input));
     seen.push(url.pathname + url.search);
     return new Response(JSON.stringify({ data: [], meta: {}, requested: 0, found: 0 }), {
-      headers: { 'x-credits-cost': '4', 'x-quota-remaining': '796', 'x-plan-withheld': 'graded, non_english_locales', 'x-cards-limit': '1000', 'x-cards-used': '37' },
+      headers: { 'x-credits-cost': '4', 'x-quota-remaining': '796', 'x-plan-withheld': 'graded, non_english_locales', 'x-cards-limit': '1000', 'x-cards-used': '37', 'x-cards-warning': 'approaching_limit' },
     });
   }});
 
@@ -33,6 +41,28 @@ test('le rotte prezzi chiamano i path giusti e gli header restano leggibili', as
   assert.deepEqual(client.lastResponse?.planWithheld, ['graded', 'non_english_locales']);
   assert.equal(client.lastResponse?.cardsLimit, 1000);
   assert.equal(client.lastResponse?.cardsUsed, 37);
+  assert.equal(client.lastResponse?.cardsWarning, 'approaching_limit');
+});
+
+test("i prezzi di un sigillato portano l'indice del prodotto, il locale della scatola e l'avviso sul tetto", async () => {
+  const sample = fixture('prices-sealed-with-index');
+  const client = new PokemonTcgApi({ apiKey: 'test', maxRetries: 0, fetch: async (input) => {
+    assert.equal(new URL(String(input)).pathname, '/v1/sealed/cn-example-booster-box/prices');
+    return Response.json(sample.body, { headers: sample.headers });
+  }});
+  const { data, meta } = await client.sealed.prices('cn-example-booster-box');
+  assert.equal(data.sealed_id, 'cn-example-booster-box');
+  assert.equal(data.index?.eur, 128.5);
+  assert.equal(data.index?.sample_n, null);
+  assert.deepEqual(data.index?.by_locale, []);
+  assert.equal(data.quotes.length, meta.quotes);
+  assert.deepEqual(data.quotes.map((q) => q.locale), ['zh', 'zh']);
+  assert.equal(client.lastResponse?.cardsWarning, 'approaching_limit');
+  assert.equal(client.lastResponse?.cardsUsed, 812);
+
+  const quiet = new PokemonTcgApi({ apiKey: 'test', maxRetries: 0, fetch: async () => Response.json({ status: 'ok' }, { headers: { 'x-cards-warning': '' } }) });
+  await quiet.health();
+  assert.equal(quiet.lastResponse?.cardsWarning, null);
 });
 
 test('PLAN_REQUIRED e TRIAL_EXPIRED hanno una classe, e restano PermissionDenied', async () => {

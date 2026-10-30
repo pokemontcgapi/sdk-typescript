@@ -323,6 +323,13 @@ export interface SealedProduct {
   readonly image_url: string | null;
   readonly release_date: string | null;
   readonly pack_count: number | null;
+  /**
+   * Le lingue in cui il prodotto esiste fisicamente (`en`, `ja`, `zh`, ...),
+   * non quelle del nome; vuoto dove il catalogo non le tiene. I sigillati
+   * della linea cinese semplificata (273 prodotti il 2026-10-30, set `cn-*`)
+   * portano `['zh']`. La lista non ha un filtro di lingua: si legge qui, e
+   * `set` restringe a un set quando lo si conosce.
+   */
   readonly languages: readonly string[];
   /** Sulle liste solo con `include: ['index']`; sul prodotto singolo sempre. */
   readonly index_eur?: number | null;
@@ -372,7 +379,13 @@ export interface CardPrices {
 
 export interface SealedPrices {
   readonly sealed_id: string;
+  /**
+   * Il prezzo di catalogo del prodotto — lo stesso `index_eur` della riga del
+   * prodotto — con la sua data; `sample_n` e' null e `by_locale` vuoto, perche'
+   * non e' l'indice composito delle carte. `null` se il prodotto non ne ha.
+   */
   readonly index: PriceIndex | null;
+  /** Ogni riga porta `locale`: la lingua in cui la scatola e' stampata (`zh` sulla linea cinese). */
   readonly quotes: readonly Price[];
 }
 
@@ -535,9 +548,10 @@ export interface VisionCandidate {
   readonly last_price_at?: string | null;
   readonly prices?: readonly Price[];
   /**
-   * Distanza di Hamming, 0..512. E' il numero su cui tarare una soglia propria:
-   * le corrispondenze reali stanno sotto 150 anche su una foto rumorosa, e
-   * niente sopra 170 viene restituito.
+   * Distanza su una scala comune 0..512: piu' bassa = piu' vicina. Distanza
+   * di Hamming per lo stadio delle firme, round(distanza coseno × 340) limitata
+   * a 0..512 per lo stadio a embedding. Niente sopra 170 viene restituito.
+   * E' il numero su cui tarare una soglia propria.
    */
   readonly distance: number;
   /** La stessa informazione riscalata in 0..1. Comoda, non piu' informativa. */

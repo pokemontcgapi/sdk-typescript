@@ -74,6 +74,13 @@ export interface ResponseInfo {
    */
   readonly cardsLimit: number | null;
   readonly cardsUsed: number | null;
+  /**
+   * `X-Cards-Warning`: `approaching_limit` su una risposta riuscita quando
+   * `cardsUsed` ha raggiunto l'80% del tetto. `null` altrimenti, e sempre dove
+   * non c'e' tetto. E' il valore grezzo dell'header, cosi' un valore nuovo
+   * arriva invece di sparire in un booleano.
+   */
+  readonly cardsWarning: string | null;
 }
 
 function headerNumber(headers: Headers, name: string): number | null {
@@ -86,6 +93,7 @@ function headerNumber(headers: Headers, name: string): number | null {
 function toResponseInfo(url: string, response: Response): ResponseInfo {
   const h = response.headers;
   const withheld = h.get('x-plan-withheld');
+  const warning = h.get('x-cards-warning');
   return {
     url,
     status: response.status,
@@ -100,6 +108,7 @@ function toResponseInfo(url: string, response: Response): ResponseInfo {
     trialExpiresAt: h.get('x-trial-expires-at'),
     cardsLimit: headerNumber(h, 'x-cards-limit'),
     cardsUsed: headerNumber(h, 'x-cards-used'),
+    cardsWarning: warning === null || warning === '' ? null : warning,
   };
 }
 

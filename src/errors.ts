@@ -32,6 +32,32 @@ export interface NextStep {
   readonly handoff: string;
 }
 
+/**
+ * Il consiglio commerciale che accompagna un rifiuto (`details.upgrade`, dal
+ * 2026-10-05): il piano meno caro che avrebbe lasciato passare la richiesta,
+ * con il prezzo di listino e il link per sottoscriverlo. E' un consiglio e non
+ * cambia l'esito: `next_step` resta la consegna all'intestatario.
+ */
+export interface UpgradeSuggestion {
+  readonly plan_code: string;
+  readonly plan_name: string;
+  /** Prezzo mensile di listino, in centesimi di `currency`. */
+  readonly monthly_cents: number;
+  readonly currency: string;
+  /**
+   * Perche' questo piano: `credits`, `daily_cap`, `card_allowance`,
+   * `trial_expired`, `history`, `vision`, `centering`, `movers`,
+   * `graded_quotes`, `all_locales`, `api_keys`, `subscription_required`.
+   */
+  readonly reason: string;
+  /** Per chi non ha ancora un abbonamento. */
+  readonly checkout_url?: string;
+  /** Per chi ne ha gia' uno: il piano si cambia dal portale. */
+  readonly manage_url?: string;
+  /** `alternative` quando il consiglio accompagna un'offerta che resta la strada principale. */
+  readonly role?: string;
+}
+
 export interface ApiErrorBody {
   readonly code: string;
   readonly message: string;
@@ -79,6 +105,28 @@ export class PokemonTcgApiError extends Error {
 
   get handoff(): string | undefined {
     return this.nextStep?.handoff;
+  }
+
+  /** `details.upgrade` quando e' ben formato; altrimenti `undefined`, mai un pezzo. */
+  get upgrade(): UpgradeSuggestion | undefined {
+    const value = this.details?.['upgrade'];
+    if (typeof value !== 'object' || value === null) return undefined;
+    const u = value as Record<string, unknown>;
+    if (typeof u['plan_code'] !== 'string' || typeof u['plan_name'] !== 'string' ||
+        typeof u['monthly_cents'] !== 'number' || typeof u['currency'] !== 'string' ||
+        typeof u['reason'] !== 'string') {
+      return undefined;
+    }
+    for (const key of ['checkout_url', 'manage_url', 'role']) {
+      if (u[key] !== undefined && typeof u[key] !== 'string') return undefined;
+    }
+    return value as UpgradeSuggestion;
+  }
+
+  /** Il link del consiglio: `checkout_url`, o `manage_url` per chi e' gia' abbonato. */
+  get upgradeUrl(): string | undefined {
+    const u = this.upgrade;
+    return u?.checkout_url ?? u?.manage_url;
   }
 
   constructor(status: number, body: ApiErrorBody) {

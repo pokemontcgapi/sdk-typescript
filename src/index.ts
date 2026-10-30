@@ -214,7 +214,11 @@ class SealedResource {
     return this.http.get<SealedProduct>(`/v1/sealed/${encodeURIComponent(id)}`, { ...params });
   }
 
-  /** Prezzi correnti di un prodotto. 2 crediti. L'indice composito non copre i sigillati: `index` e' `null`. */
+  /**
+   * Prezzi correnti di un prodotto. 2 crediti. `index` porta l'`index_eur` del
+   * prodotto con la sua data, o `null` se non ne ha; ogni riga porta `locale`,
+   * la lingua in cui la scatola e' stampata (`zh` sulla linea cinese).
+   */
   prices(id: string, params: PriceFilterParams = {}): Promise<PricesResponse<SealedPrices>> {
     return this.http.get<PricesResponse<SealedPrices>>(`/v1/sealed/${encodeURIComponent(id)}/prices`, { ...params });
   }
