@@ -2,7 +2,7 @@
 
 [![npm](https://img.shields.io/npm/v/%40pokemontcgapi%2Fsdk)](https://www.npmjs.com/package/@pokemontcgapi/sdk) [![license](https://img.shields.io/npm/l/%40pokemontcgapi%2Fsdk)](./LICENSE) [![CI](https://github.com/pokemontcgapi/sdk-typescript/actions/workflows/ci.yml/badge.svg)](https://github.com/pokemontcgapi/sdk-typescript/actions/workflows/ci.yml)
 
-TypeScript client for the Pokémon TCG API at [pokemontcgapi.com](https://pokemontcgapi.com): cards,
+TypeScript client for the Pokémon TCG API at [pokemontcgapi.com](https://pokemontcgapi.com/?utm_source=npm&utm_medium=readme&utm_campaign=sdk_typescript): cards,
 sets, illustrators, the reference vocabularies and photo recognition, across three print lines,
 international, Japanese and Simplified Chinese, with card names in eight locales, images, and prices
 that state their source, basis, grade and sample size. The current counts are live at
@@ -39,11 +39,11 @@ Lost the response? Repeat the exact same request (same Idempotency-Key, same bod
 
 We store only a hash of the key; the signup response is kept for 24 hours so the same request can be replayed. Save `data.key.secret` now.
 
-If replay is unavailable, [sign in](https://pokemontcgapi.com/account) and rotate the key, or use /v1/accounts/recover with an already verified email to get a new secret.
+If replay is unavailable, [sign in](https://pokemontcgapi.com/account?utm_source=npm&utm_medium=readme&utm_campaign=sdk_typescript) and rotate the key, or use /v1/accounts/recover with an already verified email to get a new secret.
 
 The key comes back in `data.key.secret`. Confirming the address we email raises the trial from
 80 to 800 credits, and the trial ends 30 days after signup. Paid plans start at 29 EUR a month:
-[pricing](https://pokemontcgapi.com/pricing).
+[pricing](https://pokemontcgapi.com/pricing?utm_source=npm&utm_medium=readme&utm_campaign=sdk_typescript).
 
 ## Install
 
@@ -87,8 +87,8 @@ have different credit costs. `lang` selects a name translation, not a print regi
 Use `client.sets.list({ region: 'JP', limit: 250 })` to browse set metadata and
 `client.sets.cards('obf', { limit: 250 })` when you need one particular set. For all cards,
 the flat list uses fewer requests than a card loop for every set. The
-[quickstart](https://pokemontcgapi.com/docs/quickstart#page-the-whole-catalogue) includes dated
-measurements, and the [migration guide](https://pokemontcgapi.com/docs/migrate-from-pokemontcg-io)
+[quickstart](https://pokemontcgapi.com/docs/quickstart?utm_source=npm&utm_medium=readme&utm_campaign=sdk_typescript#page-the-whole-catalogue) includes dated
+measurements, and the [migration guide](https://pokemontcgapi.com/docs/migrate-from-pokemontcg-io?utm_source=npm&utm_medium=readme&utm_campaign=sdk_typescript)
 explains capturing the change feed watermark before an import and keeping the replica current.
 
 The cursor carries a signature of the sort order, so it must never be reconstructed by hand — the SDK
@@ -212,7 +212,7 @@ Validation is `INVALID_PARAMETER`; service validation carries `details.service_c
 `details.param`. `PROVIDER_UNAVAILABLE` (503, Retry-After: 2) and `FEATURE_NOT_CONFIGURED` (503)
 indicate unavailable processing or a disabled deployment; `PLAN_REQUIRED` (403) indicates a plan,
 verification or trial-call restriction. Errors refund credits and trial reservations. POSTs are
-never retried by the SDK. See the [two-step guide](https://pokemontcgapi.com/docs/centering).
+never retried by the SDK. See the [two-step guide](https://pokemontcgapi.com/docs/centering?utm_source=npm&utm_medium=readme&utm_campaign=sdk_typescript).
 
 ### Errors you can branch on
 
@@ -356,8 +356,8 @@ for (;;) {
 ## Also available
 
 - **MCP server** for agents: [`@pokemontcgapi/mcp`](https://www.npmjs.com/package/@pokemontcgapi/mcp) — [source](https://github.com/pokemontcgapi/mcp-server)
-- **Docs**: <https://pokemontcgapi.com/docs>
-- **Coverage, measured live**: <https://pokemontcgapi.com/coverage>
+- **Docs**: [pokemontcgapi.com/docs](https://pokemontcgapi.com/docs?utm_source=npm&utm_medium=readme&utm_campaign=sdk_typescript)
+- **Coverage, measured live**: [pokemontcgapi.com/coverage](https://pokemontcgapi.com/coverage?utm_source=npm&utm_medium=readme&utm_campaign=sdk_typescript)
 
 ## Build from source
 
@@ -372,7 +372,7 @@ package typechecks and builds on both Node 20 and Node 22, and that `npm pack` p
 the file list the registry is meant to receive.
 
 This package is developed inside the private monorepo that runs
-[pokemontcgapi.com](https://pokemontcgapi.com) and mirrored here on each release,
+[pokemontcgapi.com](https://pokemontcgapi.com/?utm_source=npm&utm_medium=readme&utm_campaign=sdk_typescript) and mirrored here on each release,
 so a merged pull request travels back by hand rather than by merge button. That
 is not a reason to send patches elsewhere — open the issue or the PR here, it is
 the address that gets read.
@@ -380,4 +380,4 @@ the address that gets read.
 ## Licence
 
 MIT. Data served by the API carries per-source redistribution terms — see
-<https://pokemontcgapi.com/legal/attribution>.
+[pokemontcgapi.com/legal/attribution](https://pokemontcgapi.com/legal/attribution?utm_source=npm&utm_medium=readme&utm_campaign=sdk_typescript).
