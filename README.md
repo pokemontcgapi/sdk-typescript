@@ -22,6 +22,11 @@ their respective owners.
 
 ## Get a key
 
+In a browser: [pokemontcgapi.com/free-api-key](https://pokemontcgapi.com/free-api-key?utm_source=npm&utm_medium=readme&utm_campaign=sdk_typescript&utm_content=get_key)
+shows a real response next to the signup form and gives you the key on the spot, with no payment
+card. If you already know the plan you need, pick it on the same page: save your key, then select
+Continue to checkout. From a terminal, use the request below.
+
 Generate the Idempotency-Key once per signup and keep it with the request body:
 
 ```bash
