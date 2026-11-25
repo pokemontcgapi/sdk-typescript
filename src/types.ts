@@ -26,8 +26,10 @@ export type PriceSource =
   | 'PRICECHARTING'
   | 'CARDMARKET'
   | 'CARDTRADER'
-  /** Vendite concluse su eBay. `EBAY_SOLD` non e' mai esistito: il valore ammesso e' `EBAY`. */
+  /** Mediane di inserzioni ATTIVE su eBay, per perito e voto: prezzi richiesti, `basis: 'ASKING'`. */
   | 'EBAY'
+  /** Mediane di vendite CONCLUSE su eBay, per perito e voto: `basis: 'SOLD'`. Dal 2026-11-25. */
+  | 'EBAY_SOLD'
   | 'PTCG_INDEX'
   | 'COMMUNITY';
 
